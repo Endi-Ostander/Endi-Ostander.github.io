@@ -1,0 +1,91 @@
+name: Build Cordova APK
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+
+    steps:
+      # 1️⃣ Клонируем репозиторий
+      - uses: actions/checkout@v4
+
+      # 2️⃣ Смотрим содержимое корня, чтобы проверить точное имя директории
+      - name: List repo files
+        run: ls -la
+
+      # 3️⃣ Настраиваем Java 17
+      - name: Set up Java 17
+        uses: actions/setup-java@v3
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # 4️⃣ Настраиваем Node.js (если нужен Cordova CLI)
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      # 5️⃣ Устанавливаем Cordova CLI
+      - name: Install Cordova CLI
+        run: npm install -g cordova
+
+      # 6️⃣ Проверяем, существует ли директория проекта
+      - name: Check Cordova project directory
+        run: |
+          if [ -d "cordova-project" ]; then
+            echo "Directory exists, moving into it"
+            cd cordova-project
+          else
+            echo "ERROR: 'cordova-project' folder not found in repo root!"
+            echo "Please verify the folder name and update workflow"
+            exit 1
+          fi
+
+      # 7️⃣ Устанавливаем Android SDK/NDK через sdkmanager
+      - name: Install Android SDK and NDK
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y unzip wget
+
+          ANDROID_HOME=$HOME/android-sdk
+          mkdir -p $ANDROID_HOME/cmdline-tools
+          cd $ANDROID_HOME/cmdline-tools
+          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip -d latest
+          rm commandlinetools-linux-9477386_latest.zip
+
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
+          echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
+
+      # 8️⃣ Устанавливаем зависимости проекта (если есть package.json)
+      - name: Install npm dependencies
+        run: |
+          if [ -f "package.json" ]; then
+            npm install
+          else
+            echo "No package.json found. Skipping npm install."
+          fi
+
+      # 9️⃣ Собираем релиз APK
+      - name: Build Android Release APK
+        run: |
+          cordova build android --release
+
+      # 🔟 Проверяем, что APK создан
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: cordova-apk
+          path: cordova-project/platforms/android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 5
