@@ -1,4 +1,4 @@
-name: Build Cordova APK
+name: Build Cordova Debug APK
 
 on:
   push:
@@ -35,16 +35,16 @@ jobs:
       - name: Install Cordova CLI
         run: npm install -g cordova
 
-      # 6️⃣ Проверяем, есть ли директория проекта
+      # 6️⃣ Проверяем директорию проекта
       - name: Check Cordova project directory
         run: |
           if [ ! -d "cordova-project" ]; then
-            echo "ERROR: 'cordova-project' folder not found in repo root!"
+            echo "ERROR: 'cordova-project' folder not found!"
             exit 1
           fi
 
-      # 7️⃣ Android SDK и NDK
-      - name: Install Android SDK and NDK
+      # 7️⃣ Установка Android SDK и build-tools
+      - name: Install Android SDK
         run: |
           sudo apt-get update
           sudo apt-get install -y unzip wget
@@ -63,46 +63,34 @@ jobs:
           echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
           yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;35.0.0"
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;25.2.9519653"
-          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
 
-      # 8️⃣ Устанавливаем npm-зависимости проекта
+      # 8️⃣ Установка npm-зависимостей проекта
       - name: Install npm dependencies
         run: |
           cd cordova-project
           if [ -f "package.json" ]; then
             npm install
-          else
-            echo "No package.json found. Skipping npm install."
           fi
 
-      # 8.1️⃣ Чистим старый whitelist и ставим новый
-      - name: Fix whitelist plugin
-        run: |
-          cd cordova-project
-          cordova plugin remove cordova-plugin-whitelist || true
-          cordova plugin add cordova-plugin-whitelist@1.3.5
-
-      # 9️⃣ Добавляем Android-платформу всегда
+      # 9️⃣ Добавляем Android платформу
       - name: Add Android platform
         run: |
           cd cordova-project
           cordova platform remove android || true
           cordova platform add android
 
-      # 🔟 Сборка релизного APK
-      - name: Build Android Release APK
+      # 🔟 Сборка debug APK
+      - name: Build Android Debug APK
         run: |
           cd cordova-project
-          cordova build android --release
+          cordova build android --debug
 
-      # 1️⃣1️⃣ Загружаем APK как артефакт
-      - name: Upload APK
+      # 1️⃣1️⃣ Загрузка APK как артефакт
+      - name: Upload Debug APK
         uses: actions/upload-artifact@v4
         with:
           name: cordova-apk
-          path: cordova-project/platforms/android/app/build/outputs/apk/release/app-release.apk
+          path: cordova-project/platforms/android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 5
-
