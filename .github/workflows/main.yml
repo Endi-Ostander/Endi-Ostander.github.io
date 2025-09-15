@@ -14,7 +14,7 @@ jobs:
       # 1️⃣ Клонируем репозиторий
       - uses: actions/checkout@v4
 
-      # 2️⃣ Смотрим содержимое корня, чтобы проверить имя директории
+      # 2️⃣ Проверяем содержимое репозитория
       - name: List repo files
         run: ls -la
 
@@ -35,7 +35,7 @@ jobs:
       - name: Install Cordova CLI
         run: npm install -g cordova
 
-      # 6️⃣ Проверяем, существует ли директория Cordova проекта
+      # 6️⃣ Проверяем, существует ли директория проекта
       - name: Check Cordova project directory
         run: |
           if [ -d "cordova-project" ]; then
@@ -54,23 +54,18 @@ jobs:
           ANDROID_HOME=$HOME/android-sdk
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd $ANDROID_HOME/cmdline-tools
-
-          # Распаковываем архив в tmp, потом переносим правильно
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip -d tmp
-          mv tmp/cmdline-tools latest
-          rm -rf tmp commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip -d latest
+          rm commandlinetools-linux-9477386_latest.zip
 
-          # Экспорт переменных окружения
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
-          # Принимаем лицензии и ставим платформы
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-
-      # 8️⃣ Устанавливаем npm-зависимости проекта
+      # 8️⃣ Устанавливаем зависимости проекта
       - name: Install npm dependencies
         run: |
           cd cordova-project
@@ -80,13 +75,23 @@ jobs:
             echo "No package.json found. Skipping npm install."
           fi
 
-      # 9️⃣ Собираем релиз APK
+      # 9️⃣ Добавляем Android платформу (если ещё не добавлена)
+      - name: Add Android platform
+        run: |
+          cd cordova-project
+          if [ ! -d "platforms/android" ]; then
+            cordova platform add android
+          else
+            echo "Android platform already added"
+          fi
+
+      # 🔟 Собираем релиз APK
       - name: Build Android Release APK
         run: |
           cd cordova-project
           cordova build android --release
 
-      # 🔟 Проверяем и загружаем APK
+      # 1️⃣1️⃣ Загружаем APK как артефакт
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -94,4 +99,3 @@ jobs:
           path: cordova-project/platforms/android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 5
-
