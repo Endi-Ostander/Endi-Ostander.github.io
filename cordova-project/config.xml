@@ -12,5 +12,4 @@
     <preference name="Orientation" value="portrait" />
     <allow-navigation href="*" />
     <access origin="*" />
-    <plugin name="cordova-plugin-whitelist" source="npm" />
 </widget>
