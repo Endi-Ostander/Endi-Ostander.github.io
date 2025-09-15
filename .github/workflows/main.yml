@@ -14,7 +14,7 @@ jobs:
       # 1️⃣ Клонируем репозиторий
       - uses: actions/checkout@v4
 
-      # 2️⃣ Проверяем содержимое репозитория
+      # 2️⃣ Просматриваем корень репозитория
       - name: List repo files
         run: ls -la
 
@@ -25,7 +25,7 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      # 4️⃣ Настраиваем Node.js
+      # 4️⃣ Настраиваем Node.js (для Cordova CLI)
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
@@ -35,37 +35,48 @@ jobs:
       - name: Install Cordova CLI
         run: npm install -g cordova
 
-      # 6️⃣ Проверяем, существует ли директория проекта
+      # 6️⃣ Проверяем директорию проекта
       - name: Check Cordova project directory
         run: |
-          if [ -d "cordova-project" ]; then
-            echo "Directory exists"
-          else
+          if [ ! -d "cordova-project" ]; then
             echo "ERROR: 'cordova-project' folder not found in repo root!"
             exit 1
           fi
 
-      # 7️⃣ Устанавливаем Android SDK/NDK через sdkmanager
+      - name: Move into project directory
+        run: cd cordova-project
+        shell: bash
+
+      # 7️⃣ Устанавливаем Android SDK/NDK
       - name: Install Android SDK and NDK
         run: |
           sudo apt-get update
           sudo apt-get install -y unzip wget
 
-          ANDROID_HOME=$HOME/android-sdk
+          export ANDROID_HOME=$HOME/android-sdk
           mkdir -p $ANDROID_HOME/cmdline-tools
           cd $ANDROID_HOME/cmdline-tools
+
+          # Скачиваем и распаковываем командные инструменты
           wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip -d latest
-          rm commandlinetools-linux-9477386_latest.zip
+          unzip -q commandlinetools-linux-9477386_latest.zip -d tmp
+          mv tmp/cmdline-tools latest
+          rm -rf tmp commandlinetools-linux-9477386_latest.zip
 
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
-
+          # Добавляем пути в окружение
           echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
           echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
           echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
 
-      # 8️⃣ Устанавливаем зависимости проекта
+          # Принимаем лицензии и устанавливаем платформы
+          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;34.0.0"
+
+          # Устанавливаем NDK
+          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "ndk;25.2.9519653"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/25.2.9519653" >> $GITHUB_ENV
+
+      # 8️⃣ Устанавливаем npm-зависимости проекта
       - name: Install npm dependencies
         run: |
           cd cordova-project
@@ -75,14 +86,12 @@ jobs:
             echo "No package.json found. Skipping npm install."
           fi
 
-      # 9️⃣ Добавляем Android платформу (если ещё не добавлена)
+      # 9️⃣ Добавляем платформу Android (если еще нет)
       - name: Add Android platform
         run: |
           cd cordova-project
-          if [ ! -d "platforms/android" ]; then
+          if ! cordova platform list | grep -q android; then
             cordova platform add android
-          else
-            echo "Android platform already added"
           fi
 
       # 🔟 Собираем релиз APK
