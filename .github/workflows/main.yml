@@ -22,11 +22,15 @@ jobs:
       - name: Установка Cordova
         run: npm install -g cordova
 
-      - name: Обновление whitelist-плагина
+      - name: Установка плагинов
         run: |
           cd cordova-project
+          # whitelist больше не нужен на cordova-android@13
           cordova plugin remove cordova-plugin-whitelist || true
-          cordova plugin add cordova-plugin-whitelist@latest
+          # cleartext для разрешения HTTP-запросов
+          cordova plugin add cordova-plugin-cleartext
+          # inappbrowser если нужен
+          cordova plugin add cordova-plugin-inappbrowser
 
       - name: Сборка Android APK (debug)
         run: |
@@ -34,6 +38,10 @@ jobs:
           cordova platform remove android || true
           cordova platform add android
           cordova build android --debug
+
+      - name: Проверка наличия usesCleartextTraffic
+        run: |
+          grep usesCleartextTraffic cordova-project/platforms/android/app/src/main/AndroidManifest.xml || (echo "usesCleartextTraffic not found!" && exit 1)
 
       - name: Загрузка APK как артефакта
         uses: actions/upload-artifact@v4
