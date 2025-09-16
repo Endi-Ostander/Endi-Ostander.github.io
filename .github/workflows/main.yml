@@ -4,56 +4,39 @@ on:
   push:
     branches:
       - main
+  pull_request:
 
 jobs:
-  build:
+  build-android:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout репозитория
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Установка Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 18
+          node-version: '18'
 
-      - name: Install Cordova
+      - name: Установка Cordova
         run: npm install -g cordova
 
-      - name: Install Android SDK
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y unzip wget
-
-          export ANDROID_HOME=$HOME/android-sdk
-          mkdir -p $ANDROID_HOME/cmdline-tools
-          cd $ANDROID_HOME/cmdline-tools
-
-          wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip
-          unzip -q commandlinetools-linux-9477386_latest.zip -d tmp
-          mv tmp/cmdline-tools latest
-          rm -rf tmp commandlinetools-linux-9477386_latest.zip
-
-          echo "ANDROID_HOME=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> $GITHUB_ENV
-          echo "$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools" >> $GITHUB_PATH
-
-          yes | $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager --licenses
-          $ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager "platform-tools" "platforms;android-34" "build-tools;35.0.0"
-
-      - name: Prepare Cordova project
+      - name: Обновление whitelist-плагина
         run: |
           cd cordova-project
+          cordova plugin remove cordova-plugin-whitelist || true
+          cordova plugin add cordova-plugin-whitelist@latest
+
+      - name: Сборка Android APK (debug)
+        run: |
+          cd cordova-project
+          cordova platform remove android || true
           cordova platform add android
-
-      - name: Build Android APK
-        run: |
-          cd cordova-project
           cordova build android --debug
 
-      - name: Upload APK artifact
+      - name: Загрузка APK как артефакта
         uses: actions/upload-artifact@v4
         with:
-          name: android-apk
+          name: cordova-android-debug-apk
           path: cordova-project/platforms/android/app/build/outputs/apk/debug/app-debug.apk
