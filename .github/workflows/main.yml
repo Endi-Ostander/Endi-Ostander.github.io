@@ -26,7 +26,6 @@ jobs:
         run: |
           cd cordova-project
           cordova plugin add cordova-plugin-cleartext
-          inappbrowser если нужен
           cordova plugin add cordova-plugin-inappbrowser
 
       - name: Сборка Android APK (debug)
