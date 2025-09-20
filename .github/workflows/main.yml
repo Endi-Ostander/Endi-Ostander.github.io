@@ -25,7 +25,6 @@ jobs:
       - name: Установка плагинов
         run: |
           cd cordova-project
-          cleartext для разрешения HTTP-запросов
           cordova plugin add cordova-plugin-cleartext
           inappbrowser если нужен
           cordova plugin add cordova-plugin-inappbrowser
