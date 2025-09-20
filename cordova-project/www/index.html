@@ -1,306 +1,442 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Mini Desktop Mobile</title>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Mini Desktop Mobile — улучшенный</title>
 <style>
-body {
-  margin: 0;
-  font-family: Arial, sans-serif;
-  background: #121212;
-  color: #fff;
-  overflow-x: hidden;
-}
+  /* ========== Общие стили ========== */
+  :root{
+    --bg:#121212; --panel:#1e1e1e; --muted:#2a2a2a; --accent:#3a82f6; --danger:#d9534f; --text:#fff;
+  }
+  html,body{height:100%;margin:0;background:var(--bg);color:var(--text);font-family:Inter, Arial, sans-serif;}
+  #desktop{display:flex;flex-wrap:wrap;gap:15px;padding:15px;padding-right:260px;box-sizing:border-box;}
+  .tile{width:80px;height:80px;background:var(--panel);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;cursor:pointer;transition:all .18s;user-select:none;}
+  .tile:hover{transform:scale(1.05);background:#2c2c2c}
+  .tile span{font-size:11px;text-align:center;word-break:break-word}
+  #start-button{position:fixed;left:15px;bottom:15px;background:var(--panel);padding:12px 16px;border-radius:8px;cursor:pointer;z-index:150;box-shadow:0 6px 18px rgba(0,0,0,.6)}
+  #start-menu{position:fixed;left:15px;bottom:60px;background:var(--panel);padding:12px;border-radius:8px;display:none;flex-direction:column;gap:8px;z-index:150;width:220px;box-shadow:0 10px 30px rgba(0,0,0,.6)}
+  #start-menu.open{display:flex}
+  #start-menu .row{display:flex;align-items:center;gap:8px}
+  #start-menu button{background:transparent;border:none;color:var(--text);padding:8px;border-radius:6px;text-align:left;cursor:pointer}
+  #start-menu button:hover{background:#2c2c2c}
 
-#desktop {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-start;
-  padding: 15px;
-  gap: 15px;
-}
+  /* Контекстное меню */
+  .context-menu{position:absolute;background:#2c2c2c;border-radius:6px;padding:5px 0;display:none;flex-direction:column;z-index:200;box-shadow:0 8px 30px rgba(0,0,0,.6)}
+  .context-menu button{background:transparent;border:none;color:var(--text);padding:8px 12px;text-align:left;cursor:pointer}
+  .context-menu button:hover{background:#3a3a3a}
 
-.tile {
-  width: 80px;
-  height: 80px;
-  background: #1e1e1e;
-  border-radius: 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s;
-  user-select: none;
-}
-.tile:hover { background: #2c2c2c; transform: scale(1.05); }
-.tile span { text-align: center; font-size: 11px; word-break: break-word; }
+  /* Редактор */
+  #editor-overlay{position:fixed;inset:0;background:rgba(0,0,0,.95);display:none;flex-direction:column;z-index:300}
+  #editor-overlay textarea{flex:1;width:100%;background:#141414;color:var(--text);border:none;padding:12px;font-family:monospace;font-size:14px;resize:none}
+  #editor-controls{display:flex;gap:8px;padding:8px;background:linear-gradient(180deg, rgba(0,0,0,.2), rgba(0,0,0,0));}
 
-#start-button {
-  position: fixed;
-  bottom: 15px;
-  left: 15px;
-  background: #1e1e1e;
-  color: #fff;
-  padding: 12px 20px;
-  border-radius: 6px;
-  cursor: pointer;
-  box-shadow: 0 0 5px #000;
-  z-index: 100;
-}
+  /* Toasts — анимированные */
+  #toast-container{position:fixed;right:18px;bottom:18px;z-index:600;display:flex;flex-direction:column;gap:10px;align-items:flex-end}
+  .toast{min-width:160px;max-width:360px;padding:10px 14px;border-radius:10px;color:#fff;box-shadow:0 10px 30px rgba(0,0,0,.5);opacity:0;transform:translateX(20px) translateY(8px);animation:toast-in .36s forwards}
+  .toast.info{background:#2a2a2a}
+  .toast.success{background:linear-gradient(90deg,#2a2a2a,#2f7a5a)}
+  .toast.error{background:linear-gradient(90deg,var(--danger),#b33)}
+  @keyframes toast-in{to{opacity:1;transform:translateX(0) translateY(0)}}
+  @keyframes toast-out{to{opacity:0;transform:translateX(20px) translateY(6px)}}
 
-#start-menu {
-  position: fixed;
-  bottom: 60px;
-  left: 15px;
-  background: #1e1e1e;
-  padding: 12px;
-  border-radius: 6px;
-  display: none;
-  flex-direction: column;
-  gap: 8px;
-  box-shadow: 0 0 5px #000;
-}
-#start-menu.open { display: flex; }
-#start-menu button {
-  background: #2a2a2a;
-  color: white;
-  border: none;
-  padding: 8px 12px;
-  border-radius: 4px;
-  cursor: pointer;
-}
-#start-menu button:hover { background: #3a3a3a; }
+  /* Проводник (Explorer) — боковая панель */
+  #explorer-panel{position:fixed;right:0;top:0;height:100%;width:250px;background:#0f1113;border-left:1px solid rgba(255,255,255,.03);z-index:140;display:flex;flex-direction:column;padding:12px;box-sizing:border-box}
+  #explorer-panel .header{font-weight:600;margin-bottom:10px}
+  #explorer-tree{overflow:auto;flex:1;padding-right:6px}
+  .expl-node{padding:6px 8px;border-radius:6px;color:#ddd;cursor:pointer;display:flex;align-items:center;gap:8px}
+  .expl-node:hover{background:rgba(255,255,255,.02)}
+  .expl-node .toggle{width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;font-size:12px}
+  .expl-children{margin-left:16px;display:none}
+  .expl-children.open{display:block}
+  .small-muted{font-size:12px;color:#9aa0a6}
 
-.context-menu {
-  position: absolute;
-  background: #2c2c2c;
-  border-radius: 6px;
-  display: none;
-  flex-direction: column;
-  padding: 5px 0;
-  z-index: 200;
-  box-shadow: 0 0 10px #000;
-}
-.context-menu button {
-  background: transparent;
-  color: #fff;
-  border: none;
-  padding: 6px 15px;
-  text-align: left;
-  cursor: pointer;
-}
-.context-menu button:hover { background: #3a3a3a; }
-#editor-overlay {
-  position: fixed;
-  top:0; left:0; right:0; bottom:0;
-  background: rgba(0,0,0,0.95);
-  display: none;
-  flex-direction: column;
-  z-index: 300;
-}
-#editor-overlay textarea {
-  flex: 1;
-  width: 100%;
-  background: #1e1e1e;
-  color: #fff;
-  border: none;
-  padding: 10px;
-  font-family: monospace;
-  font-size: 14px;
-  resize: none;
-}
-#editor-overlay button {
-  padding: 10px;
-  border: none;
-  background: #2a2a2a;
-  color: #fff;
-  cursor: pointer;
-}
-#editor-overlay button:hover { background: #3a3a3a; }
+  /* Responsive */
+  @media (max-width:700px){
+    #desktop{padding-right:0}
+    #explorer-panel{width:100%;height:40%;bottom:0;top:auto;left:0;border-left:none;border-top:1px solid rgba(255,255,255,.03)}
+  }
 </style>
 </head>
 <body>
 
-<div id="desktop"></div>
-<div id="start-button" onclick="toggleStartMenu()">Пуск</div>
-<div id="start-menu">
-  <button onclick="loadDesktop('')">Домой</button>
-  <button onclick="createFilePrompt()">Создать файл</button>
-  <button onclick="createFolderPrompt()">Создать папку</button>
-</div>
+  <div id="desktop" aria-live="polite"></div>
 
-<div id="editor-overlay">
-  <textarea id="editor-text"></textarea>
-  <button onclick="saveFile()">Сохранить</button>
-  <button onclick="closeEditor()">Закрыть</button>
-</div>
+  <div id="start-button" role="button" tabindex="0" aria-label="Пуск" onclick="toggleStartMenu()">Пуск</div>
 
-<div id="context-menu" class="context-menu"></div>
+  <div id="start-menu" aria-hidden="true">
+    <div class="row"><strong>Пуск</strong><div style="flex:1"></div><span class="small-muted">Mini Desktop</span></div>
+    <button onclick="loadDesktop('')">Домой</button>
+    <button onclick="createFilePrompt()">Создать файл</button>
+    <button onclick="createFolderPrompt()">Создать папку</button>
+    <button onclick="openExplorer()">Проводник</button>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,.03);margin:8px 0" />
+    <!-- Пометка: здесь скрыты ярлыки программ (будут реализованы позже).
+         Пока не отображаем ярлыки, но место в меню оставлено. -->
+    <div style="padding:6px 8px;color:#9aa0a6;font-size:13px">Ярлыки программ скрыты (будут позже)</div>
+  </div>
+
+  <div id="context-menu" class="context-menu" role="menu"></div>
+
+  <div id="editor-overlay" role="dialog" aria-modal="true">
+    <div id="editor-controls">
+      <button onclick="saveFile()">Сохранить</button>
+      <button onclick="closeEditor()">Закрыть</button>
+      <div style="flex:1"></div>
+      <span id="editor-path" class="small-muted"></span>
+    </div>
+    <textarea id="editor-text" spellcheck="false"></textarea>
+  </div>
+
+  <div id="explorer-panel" style="display:none">
+    <div class="header">Проводник</div>
+    <div id="explorer-tree"></div>
+    <div style="padding-top:10px">
+      <button onclick="closeExplorer()">Закрыть</button>
+    </div>
+  </div>
+
+  <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
 
 <script>
+/* ================== Настройки (оставляем ключ и URL жестко — как ты просил) ================== */
 const API_KEY = "SECRET123";
 const BASE_URL = window.location.origin.includes(".ts.net")
   ? window.location.origin
-  : "https://desktop-ehi37qq.tail096c20.ts.net:8888";
+  : "https://desktop-ehi37qq.tail096c20.ts.net:8888"; // fallback
+
 let currentPath = "";
 let selectedItem = null;
+let editingFile = null;
 
-// ==================== Основная загрузка ====================
-function loadDesktop(path="") {
-  fetch(`${BASE_URL}/list?path=${encodeURIComponent(path)}`, { headers: {"X-API-KEY":API_KEY} })
-    .then(r=>r.json())
-    .then(data=>{
-      if(data.error){alert(data.error); return;}
-      currentPath = data.path;
-      const desktop = document.getElementById("desktop");
-      desktop.innerHTML = "";
-
-      // кнопка "Назад"
-      if(currentPath){
-        const back = document.createElement("div");
-        back.className="tile";
-        back.onclick=()=>{ const parts=currentPath.split("/").filter(Boolean); parts.pop(); loadDesktop(parts.join("/"))};
-        back.innerHTML=`<span style="font-size:36px;">⬅️</span><span>Назад</span>`;
-        desktop.appendChild(back);
-      }
-
-      data.items.forEach(item=>{
-        const div = document.createElement("div");
-        div.className="tile";
-        div.oncontextmenu = (e)=>{ e.preventDefault(); showContextMenu(e,item); };
-        div.ondblclick = ()=>{ if(item.is_dir) loadDesktop(currentPath?currentPath+"/"+item.name:item.name); else openEditor(item); };
-        div.innerHTML=`<span style="font-size:36px;">${item.is_dir?"📁":"📄"}</span><span>${item.name}</span>`;
-        desktop.appendChild(div);
-      });
-    }).catch(err=>alert("Ошибка соединения: "+err));
+/* ============ Toast: анимированные уведомления ============ */
+function showToast(message, type = "info", timeout = 3500) {
+  try {
+    const container = document.getElementById("toast-container");
+    const t = document.createElement("div");
+    t.className = "toast " + (type || "info");
+    t.textContent = message;
+    container.appendChild(t);
+    // auto hide
+    const hide = () => {
+      t.style.animation = "toast-out .28s forwards";
+      setTimeout(()=> t.remove(), 300);
+    };
+    setTimeout(hide, timeout);
+    // click to close
+    t.addEventListener("click", hide);
+    return t;
+  } catch (e) {
+    console.warn("Toast error", e);
+  }
 }
 
-// ==================== Контекстное меню ====================
-function showContextMenu(e,item){
+/* ============ Загрузка рабочего стола ============ */
+function loadDesktop(path = "") {
+  fetch(`${BASE_URL}/list?path=${encodeURIComponent(path)}`, {
+    headers: {"X-API-KEY": API_KEY}
+  })
+  .then(async r => {
+    if (!r.ok) {
+      const txt = await r.text().catch(()=>r.statusText);
+      throw new Error(`HTTP ${r.status}: ${txt}`);
+    }
+    return r.json();
+  })
+  .then(data => {
+    if (!data || data.error) {
+      showToast(data?.error || "Ошибка: неверный ответ сервера", "error");
+      return;
+    }
+    currentPath = data.path || "";
+    renderDesktop(data.items || []);
+  })
+  .catch(err => {
+    showToast("Ошибка соединения: " + (err.message || err), "error");
+  });
+}
+
+function renderDesktop(items) {
+  const desktop = document.getElementById("desktop");
+  desktop.innerHTML = "";
+
+  // Кнопка назад (если есть путь)
+  if (currentPath) {
+    const back = document.createElement("div");
+    back.className = "tile";
+    back.onclick = () => {
+      const parts = currentPath.split("/").filter(Boolean);
+      parts.pop();
+      loadDesktop(parts.join("/"));
+    };
+    back.innerHTML = `<span style="font-size:36px">⬅️</span><span>Назад</span>`;
+    desktop.appendChild(back);
+  }
+
+  // Merge: server items + (hidden) shortcuts placeholder (we hide program shortcuts for now)
+  // If later you enable shortcuts, you can prepend them here.
+  items.forEach(item => {
+    const d = document.createElement("div");
+    d.className = "tile";
+    d.oncontextmenu = e => { e.preventDefault(); showContextMenu(e, item); };
+    d.ondblclick = () => { if (item.is_dir) { loadDesktop(currentPath ? currentPath + "/" + item.name : item.name); } else openEditor(item); };
+    d.innerHTML = `<span style="font-size:36px">${item.is_dir ? "📁" : "📄"}</span><span>${item.name}</span>`;
+    desktop.appendChild(d);
+  });
+}
+
+/* ============ Контекстное меню ============ */
+function showContextMenu(e, item) {
   selectedItem = item;
   const menu = document.getElementById("context-menu");
-  menu.innerHTML="";
+  menu.innerHTML = "";
   const actions = [
-    {name:"Открыть", fn:()=>{ if(item.is_dir) loadDesktop(currentPath?currentPath+"/"+item.name:item.name); else openEditor(item); }},
-    {name:"Удалить", fn:()=>deleteItem(item)},
-    {name:"Копировать", fn:()=>copyItem(item)},
-    {name:"Переместить", fn:()=>moveItem(item)}
+    {name: "Открыть", fn: ()=> { if (item.is_dir) loadDesktop(currentPath?currentPath+"/"+item.name:item.name); else openEditor(item); }},
+    {name: "Удалить", fn: ()=> deleteItem(item)},
+    {name: "Копировать", fn: ()=> copyItem(item)},
+    {name: "Переместить", fn: ()=> moveItem(item)}
   ];
   actions.forEach(a=>{
     const btn = document.createElement("button");
-    btn.innerText=a.name;
-    btn.onclick=()=>{ a.fn(); hideContextMenu(); };
+    btn.textContent = a.name;
+    btn.onclick = ()=>{ a.fn(); hideContextMenu(); };
     menu.appendChild(btn);
   });
-  menu.style.left=e.pageX+"px";
-  menu.style.top=e.pageY+"px";
-  menu.style.display="flex";
+  menu.style.left = e.pageX + "px";
+  menu.style.top = e.pageY + "px";
+  menu.style.display = "flex";
 }
+function hideContextMenu(){ document.getElementById("context-menu").style.display = "none"; }
 document.addEventListener("click", hideContextMenu);
-function hideContextMenu(){document.getElementById("context-menu").style.display="none";}
 
-// ==================== CRUD ====================
+/* ============ CRUD ============ */
 function deleteItem(item){
-  const fullPath=currentPath?currentPath+"/"+item.name:item.name;
-  fetch(`${BASE_URL}/delete`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
-    body:JSON.stringify({name:fullPath})
-  }).then(r=>r.json()).then(d=>{if(d.success) loadDesktop(currentPath); else alert(d.error)});
+  const fullPath = currentPath ? currentPath + "/" + item.name : item.name;
+  fetch(`${BASE_URL}/delete`, {
+    method: "POST",
+    headers: {"Content-Type": "application/json","X-API-KEY": API_KEY},
+    body: JSON.stringify({name: fullPath})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d?.success) { showToast("Удалено"); loadDesktop(currentPath); }
+    else showToast(d?.error || "Ошибка удаления", "error");
+  })
+  .catch(err => showToast("Ошибка: " + err, "error"));
 }
 
 function copyItem(item){
   const dst = prompt("Копировать в путь (относительно корня):");
-  if(!dst) return;
-  const srcPath=currentPath?currentPath+"/"+item.name:item.name;
-  fetch(`${BASE_URL}/copy`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
-    body:JSON.stringify({src:srcPath,dst:dst})
-  }).then(r=>r.json()).then(d=>{if(d.success) loadDesktop(currentPath); else alert(d.error)});
+  if (!dst) return;
+  const srcPath = currentPath ? currentPath + "/" + item.name : item.name;
+  fetch(`${BASE_URL}/copy`, {
+    method:"POST", headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body: JSON.stringify({src: srcPath, dst: dst})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d?.success) { showToast("Скопировано"); loadDesktop(currentPath); }
+    else showToast(d?.error || "Ошибка копирования", "error");
+  })
+  .catch(err => showToast("Ошибка: " + err, "error"));
 }
 
 function moveItem(item){
   const dst = prompt("Переместить в путь (относительно корня):");
-  if(!dst) return;
-  const srcPath=currentPath?currentPath+"/"+item.name:item.name;
-  fetch(`${BASE_URL}/move`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
-    body:JSON.stringify({src:srcPath,dst:dst})
-  }).then(r=>r.json()).then(d=>{if(d.success) loadDesktop(currentPath); else alert(d.error)});
+  if (!dst) return;
+  const srcPath = currentPath ? currentPath + "/" + item.name : item.name;
+  fetch(`${BASE_URL}/move`, {
+    method:"POST", headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body: JSON.stringify({src: srcPath, dst: dst})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d?.success) { showToast("Перемещено"); loadDesktop(currentPath); }
+    else showToast(d?.error || "Ошибка перемещения", "error");
+  })
+  .catch(err => showToast("Ошибка: " + err, "error"));
 }
 
-// ==================== Создание файлов/папок ====================
+/* ============ Создание файлов/папок ============ */
 function createFilePrompt(){
   const name = prompt("Введите имя файла с расширением (.txt, .py и др.):");
-  if(!name) return;
-  fetch(`${BASE_URL}/create_file`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
-    body:JSON.stringify({name:currentPath?currentPath+"/"+name
-  }).then(()=>loadDesktop(currentPath));
+  if (!name) return;
+  const payload = {name: currentPath ? currentPath + "/" + name : name};
+  fetch(`${BASE_URL}/create_file`, {
+    method:"POST", headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body: JSON.stringify(payload)
+  })
+  .then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json().catch(()=>({}));
+  })
+  .then(d => { showToast("Файл создан"); loadDesktop(currentPath); })
+  .catch(err => showToast("Ошибка: " + err, "error"));
 }
 
 function createFolderPrompt(){
   const name = prompt("Введите имя новой папки:");
-  if(!name) return;
-  fetch(`${BASE_URL}/create_folder`,{
-    method:"POST",
-    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
-    body:JSON.stringify({name:currentPath?currentPath+"/"+name:name})
-  }).then(()=>loadDesktop(currentPath));
+  if (!name) return;
+  const payload = {name: currentPath ? currentPath + "/" + name : name};
+  fetch(`${BASE_URL}/create_folder`, {
+    method:"POST", headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body: JSON.stringify(payload)
+  })
+  .then(r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.json().catch(()=>({}));
+  })
+  .then(d => { showToast("Папка создана"); loadDesktop(currentPath); })
+  .catch(err => showToast("Ошибка: " + err, "error"));
 }
 
-// ==================== Редактор ====================
-let editingFile = null;
+/* ============ Редактор ============ */
 function openEditor(item){
-  editingFile = currentPath?currentPath+"/"+item.name:item.name;
-  const editor = document.getElementById("editor-overlay");
-  editor.style.display="flex";
+  editingFile = currentPath ? currentPath + "/" + item.name : item.name;
+  const overlay = document.getElementById("editor-overlay");
+  overlay.style.display = "flex";
+  document.getElementById("editor-path").textContent = editingFile;
   fetch(`${BASE_URL}/open_file`, {
-    method:"POST",
-    headers:{
-      "X-API-KEY":API_KEY,
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({name:editingFile})
+    method:"POST", headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body: JSON.stringify({name: editingFile})
   })
-  .then(r=>r.text())
-  .then(t=>document.getElementById("editor-text").value=t);
-}
-
-function saveFile(){
-  fetch(`${BASE_URL}/save_file`,{
-    method:"POST",
-    headers:{
-      "X-API-KEY":API_KEY,
-      "Content-Type":"application/json"
-    },
-    body:JSON.stringify({
-      name:editingFile,
-      content:document.getElementById("editor-text").value
-    })
+  .then(async r => {
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return r.text();
   })
-  .then(r=>r.json())
-  .then(d=>{
-    if(d.success) alert("Сохранено!");
-    else alert(d.error);
+  .then(text => {
+    document.getElementById("editor-text").value = text;
+  })
+  .catch(err => {
+    showToast("Ошибка открытия: " + (err.message || err), "error");
   });
 }
 
-function closeEditor(){
-  document.getElementById("editor-overlay").style.display="none";
+function saveFile(){
+  const content = document.getElementById("editor-text").value;
+  if (!editingFile) { showToast("Нет файла для сохранения", "error"); return; }
+  fetch(`${BASE_URL}/save_file`, {
+    method:"POST", headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body: JSON.stringify({name: editingFile, content})
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d?.success) showToast("Файл сохранён", "success");
+    else showToast(d?.error || "Ошибка сохранения", "error");
+  })
+  .catch(err => showToast("Ошибка: " + err, "error"));
+}
+function closeEditor(){ document.getElementById("editor-overlay").style.display = "none"; }
+
+/* ============ Explorer (ленивая загрузка дерева) ============ */
+function openExplorer(){
+  document.getElementById("explorer-panel").style.display = "flex";
+  document.getElementById("start-menu").classList.remove("open");
+  buildExplorerRoot("");
 }
 
-// ==================== Меню Пуск ====================
+function closeExplorer(){
+  document.getElementById("explorer-panel").style.display = "none";
+}
+
+function buildExplorerRoot(rootPath){
+  const tree = document.getElementById("explorer-tree");
+  tree.innerHTML = "";
+  // show root node
+  const rootNode = createExplorerNode({name: rootPath || "/", path: rootPath || "", is_dir: true}, true);
+  tree.appendChild(rootNode);
+  // expand root
+  toggleExplorerNode(rootNode, true);
+}
+
+function createExplorerNode(item, isRoot=false){
+  const wrapper = document.createElement("div");
+  wrapper.className = "expl-node";
+  wrapper.dataset.path = item.path || item.name || "";
+  const toggle = document.createElement("div");
+  toggle.className = "toggle";
+  toggle.textContent = isRoot ? "▾" : "▸";
+  const label = document.createElement("div");
+  label.style.flex = "1";
+  label.textContent = item.name || item.path || "";
+  wrapper.appendChild(toggle);
+  wrapper.appendChild(label);
+  // children container
+  const children = document.createElement("div");
+  children.className = "expl-children";
+  wrapper.appendChild(children);
+
+  // click behavior
+  wrapper.onclick = (e) => {
+    e.stopPropagation();
+    // if double-click open folder in main view
+    if (e.detail === 2) {
+      const path = wrapper.dataset.path;
+      loadDesktop(path);
+      closeExplorer();
+      return;
+    }
+    // toggle
+    toggleExplorerNode(wrapper);
+  };
+
+  return wrapper;
+}
+
+function toggleExplorerNode(node, forceOpen = null){
+  const childrenWrap = node.querySelector(".expl-children");
+  const toggle = node.querySelector(".toggle");
+  const path = node.dataset.path || "";
+  const isOpen = childrenWrap.classList.contains("open");
+  const wantOpen = (forceOpen === null) ? !isOpen : !!forceOpen;
+  if (!wantOpen) {
+    childrenWrap.classList.remove("open");
+    toggle.textContent = "▸";
+    return;
+  }
+  toggle.textContent = "▾";
+  childrenWrap.classList.add("open");
+  // if children empty -> load
+  if (!childrenWrap.dataset.loaded) {
+    // fetch folder listing
+    fetch(`${BASE_URL}/list?path=${encodeURIComponent(path)}`, {
+      headers: {"X-API-KEY": API_KEY}
+    })
+    .then(async r => {
+      if (!r.ok) throw new Error(`HTTP ${r.status}`);
+      return r.json();
+    })
+    .then(data => {
+      const items = data.items || [];
+      // show folders only in explorer
+      items.filter(it => it.is_dir).forEach(dir => {
+        const child = createExplorerNode({name: dir.name, path: path ? path + "/" + dir.name : dir.name});
+        childrenWrap.appendChild(child);
+      });
+      childrenWrap.dataset.loaded = "1";
+    })
+    .catch(err => {
+      showToast("Explorer error: " + (err.message || err), "error");
+    });
+  }
+}
+
+/* ============ UI helpers ============ */
 function toggleStartMenu(){
-  document.getElementById("start-menu").classList.toggle("open");
+  const m = document.getElementById("start-menu");
+  m.classList.toggle("open");
 }
 
-loadDesktop();
+/* ============ Инициализация ============ */
+document.addEventListener("DOMContentLoaded", ()=> {
+  loadDesktop("");
+  // hide explorer on outside click (mobile-friendly)
+  document.addEventListener("click", (e)=>{
+    const start = document.getElementById("start-menu");
+    const btn = document.getElementById("start-button");
+    if (!start.contains(e.target) && !btn.contains(e.target)) start.classList.remove("open");
+  });
+});
 </script>
 
 </body>
