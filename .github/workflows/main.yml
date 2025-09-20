@@ -25,9 +25,9 @@ jobs:
       - name: Установка плагинов
         run: |
           cd cordova-project
-          # cleartext для разрешения HTTP-запросов
+          cleartext для разрешения HTTP-запросов
           cordova plugin add cordova-plugin-cleartext
-          # inappbrowser если нужен
+          inappbrowser если нужен
           cordova plugin add cordova-plugin-inappbrowser
 
       - name: Сборка Android APK (debug)
