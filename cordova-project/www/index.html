@@ -1,43 +1,285 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-  <meta charset="utf-8">
-  <title>Flask API Test (Tailscale)</title>
-  <!-- Разрешаем загрузку любых ресурсов -->
-  <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mini Desktop Mobile</title>
+<style>
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #121212;
+  color: #fff;
+  overflow-x: hidden;
+}
+
+#desktop {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+  padding: 15px;
+  gap: 15px;
+}
+
+.tile {
+  width: 80px;
+  height: 80px;
+  background: #1e1e1e;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+}
+.tile:hover { background: #2c2c2c; transform: scale(1.05); }
+.tile span { text-align: center; font-size: 11px; word-break: break-word; }
+
+#start-button {
+  position: fixed;
+  bottom: 15px;
+  left: 15px;
+  background: #1e1e1e;
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: 6px;
+  cursor: pointer;
+  box-shadow: 0 0 5px #000;
+  z-index: 100;
+}
+
+#start-menu {
+  position: fixed;
+  bottom: 60px;
+  left: 15px;
+  background: #1e1e1e;
+  padding: 12px;
+  border-radius: 6px;
+  display: none;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: 0 0 5px #000;
+}
+#start-menu.open { display: flex; }
+#start-menu button {
+  background: #2a2a2a;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+#start-menu button:hover { background: #3a3a3a; }
+
+.context-menu {
+  position: absolute;
+  background: #2c2c2c;
+  border-radius: 6px;
+  display: none;
+  flex-direction: column;
+  padding: 5px 0;
+  z-index: 200;
+  box-shadow: 0 0 10px #000;
+}
+.context-menu button {
+  background: transparent;
+  color: #fff;
+  border: none;
+  padding: 6px 15px;
+  text-align: left;
+  cursor: pointer;
+}
+.context-menu button:hover { background: #3a3a3a; }
+#editor-overlay {
+  position: fixed;
+  top:0; left:0; right:0; bottom:0;
+  background: rgba(0,0,0,0.95);
+  display: none;
+  flex-direction: column;
+  z-index: 300;
+}
+#editor-overlay textarea {
+  flex: 1;
+  width: 100%;
+  background: #1e1e1e;
+  color: #fff;
+  border: none;
+  padding: 10px;
+  font-family: monospace;
+  font-size: 14px;
+  resize: none;
+}
+#editor-overlay button {
+  padding: 10px;
+  border: none;
+  background: #2a2a2a;
+  color: #fff;
+  cursor: pointer;
+}
+#editor-overlay button:hover { background: #3a3a3a; }
+</style>
 </head>
 <body>
-  <h1>Flask API Test через Tailscale</h1>
-  <button id="btn">Загрузить список</button>
-  <pre id="output"></pre>
 
-  <script>
-    const API_KEY = "SECRET123";
-    // ✅ Используем tailnet-домен, который выдал tailscale cert
-    const BASE_URL = "https://desktop-ehi37qq.tail096c20.ts.net:8888";
+<div id="desktop"></div>
+<div id="start-button" onclick="toggleStartMenu()">Пуск</div>
+<div id="start-menu">
+  <button onclick="loadDesktop('')">Домой</button>
+  <button onclick="createFilePrompt()">Создать файл</button>
+  <button onclick="createFolderPrompt()">Создать папку</button>
+</div>
 
-    document.getElementById("btn").addEventListener("click", () => {
-      fetch(`${BASE_URL}/list`, {
-        method: "GET",
-        headers: { "X-API-KEY": API_KEY },
-        mode: "cors",
-        credentials: "omit"
-      })
-      .then(r => {
-        if (!r.ok) throw new Error("HTTP " + r.status);
-        return r.json();
-      })
-      .then(data => {
-        document.getElementById("output").textContent =
-          JSON.stringify(data, null, 2);
-      })
-      .catch(err => {
-        document.getElementById("output").textContent =
-          "Ошибка: " + err;
+<div id="editor-overlay">
+  <textarea id="editor-text"></textarea>
+  <button onclick="saveFile()">Сохранить</button>
+  <button onclick="closeEditor()">Закрыть</button>
+</div>
+
+<div id="context-menu" class="context-menu"></div>
+
+<script>
+const API_KEY = "SECRET123";
+const BASE_URL = window.location.origin.includes(".ts.net")
+  ? window.location.origin
+  : "https://desktop-ehi37qq.tail096c20.ts.net:8888";
+let currentPath = "";
+let selectedItem = null;
+
+// ==================== Основная загрузка ====================
+function loadDesktop(path="") {
+  fetch(`${BASE_URL}/list?path=${encodeURIComponent(path)}`, { headers: {"X-API-KEY":API_KEY} })
+    .then(r=>r.json())
+    .then(data=>{
+      if(data.error){alert(data.error); return;}
+      currentPath = data.path;
+      const desktop = document.getElementById("desktop");
+      desktop.innerHTML = "";
+
+      // кнопка "Назад"
+      if(currentPath){
+        const back = document.createElement("div");
+        back.className="tile";
+        back.onclick=()=>{ const parts=currentPath.split("/").filter(Boolean); parts.pop(); loadDesktop(parts.join("/"))};
+        back.innerHTML=`<span style="font-size:36px;">⬅️</span><span>Назад</span>`;
+        desktop.appendChild(back);
+      }
+
+      data.items.forEach(item=>{
+        const div = document.createElement("div");
+        div.className="tile";
+        div.oncontextmenu = (e)=>{ e.preventDefault(); showContextMenu(e,item); };
+        div.ondblclick = ()=>{ if(item.is_dir) loadDesktop(currentPath?currentPath+"/"+item.name:item.name); else openEditor(item); };
+        div.innerHTML=`<span style="font-size:36px;">${item.is_dir?"📁":"📄"}</span><span>${item.name}</span>`;
+        desktop.appendChild(div);
       });
-    });
-  </script>
-</body>
-</html>
+    }).catch(err=>alert("Ошибка соединения: "+err));
+}
 
+// ==================== Контекстное меню ====================
+function showContextMenu(e,item){
+  selectedItem = item;
+  const menu = document.getElementById("context-menu");
+  menu.innerHTML="";
+  const actions = [
+    {name:"Открыть", fn:()=>{ if(item.is_dir) loadDesktop(currentPath?currentPath+"/"+item.name:item.name); else openEditor(item); }},
+    {name:"Удалить", fn:()=>deleteItem(item)},
+    {name:"Копировать", fn:()=>copyItem(item)},
+    {name:"Переместить", fn:()=>moveItem(item)}
+  ];
+  actions.forEach(a=>{
+    const btn = document.createElement("button");
+    btn.innerText=a.name;
+    btn.onclick=()=>{ a.fn(); hideContextMenu(); };
+    menu.appendChild(btn);
+  });
+  menu.style.left=e.pageX+"px";
+  menu.style.top=e.pageY+"px";
+  menu.style.display="flex";
+}
+document.addEventListener("click", hideContextMenu);
+function hideContextMenu(){document.getElementById("context-menu").style.display="none";}
+
+// ==================== CRUD ====================
+function deleteItem(item){
+  const fullPath=currentPath?currentPath+"/"+item.name:item.name;
+  fetch(`${BASE_URL}/delete`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body:JSON.stringify({name:fullPath})
+  }).then(r=>r.json()).then(d=>{if(d.success) loadDesktop(currentPath); else alert(d.error)});
+}
+
+function copyItem(item){
+  const dst = prompt("Копировать в путь (относительно корня):");
+  if(!dst) return;
+  const srcPath=currentPath?currentPath+"/"+item.name:item.name;
+  fetch(`${BASE_URL}/copy`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body:JSON.stringify({src:srcPath,dst:dst})
+  }).then(r=>r.json()).then(d=>{if(d.success) loadDesktop(currentPath); else alert(d.error)});
+}
+
+function moveItem(item){
+  const dst = prompt("Переместить в путь (относительно корня):");
+  if(!dst) return;
+  const srcPath=currentPath?currentPath+"/"+item.name:item.name;
+  fetch(`${BASE_URL}/move`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body:JSON.stringify({src:srcPath,dst:dst})
+  }).then(r=>r.json()).then(d=>{if(d.success) loadDesktop(currentPath); else alert(d.error)});
+}
+
+// ==================== Создание файлов/папок ====================
+function createFilePrompt(){
+  const name = prompt("Введите имя файла с расширением (.txt, .py и др.):");
+  if(!name) return;
+  fetch(`${BASE_URL}/create_file`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body:JSON.stringify({name:currentPath?currentPath+"/"+name:name})
+  }).then(()=>loadDesktop(currentPath));
+}
+
+function createFolderPrompt(){
+  const name = prompt("Введите имя новой папки:");
+  if(!name) return;
+  fetch(`${BASE_URL}/create_folder`,{
+    method:"POST",
+    headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
+    body:JSON.stringify({name:currentPath?currentPath+"/"+name:name})
+  }).then(()=>loadDesktop(currentPath));
+}
+
+
+// ==================== Редактор ====================
+let editingFile = null;
+function openEditor(item){
+  editingFile = currentPath?currentPath+"/"+item.name:item.name;
+  const editor = document.getElementById("editor-overlay");
+  editor.style.display="flex";
+  fetch(`${BASE_URL}/open_file`,{headers:{"X-API-KEY":API_KEY},method:"POST",body:JSON.stringify({name:editingFile})})
+  .then(r=>r.text()).then(t=>document.getElementById("editor-text").value=t);
+}
+function saveFile(){
+  fetch(`${BASE_URL}/save_file`,{
+    headers:{"X-API-KEY":API_KEY,"Content-Type":"application/json"},
+    method:"POST",
+    body:JSON.stringify({name:editingFile,content:document.getElementById("editor-text").value})
+  }).then(r=>r.json()).then(d=>{ if(d.success) alert("Сохранено!"); else alert(d.error); });
+}
+function closeEditor(){
+  document.getElementById("editor-overlay").style.display="none";
+}
+
+// ==================== Меню Пуск ====================
+function toggleStartMenu(){document.getElementById("start-menu").classList.toggle("open");}
+
+loadDesktop();
+</script>
+
+</body>
 </html>
