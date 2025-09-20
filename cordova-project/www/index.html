@@ -2,32 +2,42 @@
 <html>
 <head>
   <meta charset="utf-8">
-  <title>Flask API Test</title>
+  <title>Flask API Test (Tailscale)</title>
   <!-- Разрешаем загрузку любых ресурсов -->
   <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:;">
 </head>
 <body>
-  <h1>Flask API Test</h1>
+  <h1>Flask API Test через Tailscale</h1>
   <button id="btn">Загрузить список</button>
   <pre id="output"></pre>
 
   <script>
     const API_KEY = "SECRET123";
-    const BASE_URL = "http://100.81.190.87:8888"; // твой Flask
+    // ✅ Используем tailnet-домен, который выдал tailscale cert
+    const BASE_URL = "https://desktop-ehi37qq.tail096c20.ts.net:8888";
 
     document.getElementById("btn").addEventListener("click", () => {
       fetch(`${BASE_URL}/list`, {
         method: "GET",
-        headers: { "X-API-KEY": API_KEY }
+        headers: { "X-API-KEY": API_KEY },
+        mode: "cors",
+        credentials: "omit"
       })
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error("HTTP " + r.status);
+        return r.json();
+      })
       .then(data => {
-        document.getElementById("output").textContent = JSON.stringify(data, null, 2);
+        document.getElementById("output").textContent =
+          JSON.stringify(data, null, 2);
       })
       .catch(err => {
-        document.getElementById("output").textContent = "Ошибка: " + err;
+        document.getElementById("output").textContent =
+          "Ошибка: " + err;
       });
     });
   </script>
 </body>
+</html>
+
 </html>
