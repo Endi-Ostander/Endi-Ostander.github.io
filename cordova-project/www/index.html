@@ -240,7 +240,7 @@ function createFilePrompt(){
   fetch(`${BASE_URL}/create_file`,{
     method:"POST",
     headers:{"Content-Type":"application/json","X-API-KEY":API_KEY},
-    body:JSON.stringify({name:currentPath?currentPath+"/"+name:name})
+    body:JSON.stringify({name:currentPath?currentPath+"/"+name
   }).then(()=>loadDesktop(currentPath));
 }
 
@@ -254,32 +254,55 @@ function createFolderPrompt(){
   }).then(()=>loadDesktop(currentPath));
 }
 
-
 // ==================== Редактор ====================
 let editingFile = null;
 function openEditor(item){
   editingFile = currentPath?currentPath+"/"+item.name:item.name;
   const editor = document.getElementById("editor-overlay");
   editor.style.display="flex";
-  fetch(`${BASE_URL}/open_file`,{headers:{"X-API-KEY":API_KEY},method:"POST",body:JSON.stringify({name:editingFile})})
-  .then(r=>r.text()).then(t=>document.getElementById("editor-text").value=t);
+  fetch(`${BASE_URL}/open_file`, {
+    method:"POST",
+    headers:{
+      "X-API-KEY":API_KEY,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({name:editingFile})
+  })
+  .then(r=>r.text())
+  .then(t=>document.getElementById("editor-text").value=t);
 }
+
 function saveFile(){
   fetch(`${BASE_URL}/save_file`,{
-    headers:{"X-API-KEY":API_KEY,"Content-Type":"application/json"},
     method:"POST",
-    body:JSON.stringify({name:editingFile,content:document.getElementById("editor-text").value})
-  }).then(r=>r.json()).then(d=>{ if(d.success) alert("Сохранено!"); else alert(d.error); });
+    headers:{
+      "X-API-KEY":API_KEY,
+      "Content-Type":"application/json"
+    },
+    body:JSON.stringify({
+      name:editingFile,
+      content:document.getElementById("editor-text").value
+    })
+  })
+  .then(r=>r.json())
+  .then(d=>{
+    if(d.success) alert("Сохранено!");
+    else alert(d.error);
+  });
 }
+
 function closeEditor(){
   document.getElementById("editor-overlay").style.display="none";
 }
 
 // ==================== Меню Пуск ====================
-function toggleStartMenu(){document.getElementById("start-menu").classList.toggle("open");}
+function toggleStartMenu(){
+  document.getElementById("start-menu").classList.toggle("open");
+}
 
 loadDesktop();
 </script>
 
 </body>
 </html>
+
