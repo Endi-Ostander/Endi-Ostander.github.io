@@ -342,84 +342,80 @@ function closeExplorer(){
 function buildExplorerRoot(rootPath){
   const tree = document.getElementById("explorer-tree");
   tree.innerHTML = "";
-  // show root node
+  // создаём root node
   const rootNode = createExplorerNode({name: rootPath || "/", path: rootPath || "", is_dir: true}, true);
   tree.appendChild(rootNode);
-  // expand root
-  toggleExplorerNode(rootNode, true);
+
+  // ищем контейнер для детей root
+  const childrenContainer = rootNode.querySelector(".explorer-children");
+
+  // сразу раскрываем root
+  toggleExplorerNode(rootNode, childrenContainer);
 }
 
-function createExplorerNode(item, isRoot=false){
-  const wrapper = document.createElement("div");
-  wrapper.className = "expl-node";
-  wrapper.dataset.path = item.path || item.name || "";
-  const toggle = document.createElement("div");
-  toggle.className = "toggle";
-  toggle.textContent = isRoot ? "▾" : "▸";
-  const label = document.createElement("div");
-  label.style.flex = "1";
-  label.textContent = item.name || item.path || "";
-  wrapper.appendChild(toggle);
-  wrapper.appendChild(label);
-  // children container
-  const children = document.createElement("div");
-  children.className = "expl-children";
-  wrapper.appendChild(children);
 
-  // click behavior
-  wrapper.onclick = (e) => {
-    e.stopPropagation();
-    // if double-click open folder in main view
-    if (e.detail === 2) {
-      const path = wrapper.dataset.path;
-      loadDesktop(path);
-      closeExplorer();
-      return;
+function createExplorerNode(item, isRoot = false) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "explorer-node";
+
+    const header = document.createElement("div");
+    header.className = "explorer-header";
+    header.textContent = item.name || "root";
+
+    const childrenContainer = document.createElement("div");
+    childrenContainer.className = "explorer-children hidden";
+
+    // ✅ всегда задаём dataset.path
+    wrapper.dataset.path = (item.path !== undefined && item.path !== null) ? item.path : "";
+
+    if (item.is_dir) {
+        header.classList.add("folder");
+        header.addEventListener("click", () => toggleExplorerNode(wrapper, childrenContainer));
+    } else {
+        header.classList.add("file");
+        header.addEventListener("click", () => openFile(wrapper.dataset.path));
     }
-    // toggle
-    toggleExplorerNode(wrapper);
-  };
 
-  return wrapper;
+    wrapper.appendChild(header);
+    wrapper.appendChild(childrenContainer);
+
+    return wrapper;
 }
 
-function toggleExplorerNode(node, forceOpen = null){
-  const childrenWrap = node.querySelector(".expl-children");
-  const toggle = node.querySelector(".toggle");
-  const path = node.dataset.path || "";
-  const isOpen = childrenWrap.classList.contains("open");
-  const wantOpen = (forceOpen === null) ? !isOpen : !!forceOpen;
-  if (!wantOpen) {
-    childrenWrap.classList.remove("open");
-    toggle.textContent = "▸";
-    return;
-  }
-  toggle.textContent = "▾";
-  childrenWrap.classList.add("open");
-  // if children empty -> load
-  if (!childrenWrap.dataset.loaded) {
-    // fetch folder listing
-    fetch(`${BASE_URL}/list?path=${encodeURIComponent(path)}`, {
-      headers: {"X-API-KEY": API_KEY}
-    })
-    .then(async r => {
-      if (!r.ok) throw new Error(`HTTP ${r.status}`);
-      return r.json();
-    })
-    .then(data => {
-      const items = data.items || [];
-      // show folders only in explorer
-      items.filter(it => it.is_dir).forEach(dir => {
-        const child = createExplorerNode({name: dir.name, path: path ? path + "/" + dir.name : dir.name});
-        childrenWrap.appendChild(child);
-      });
-      childrenWrap.dataset.loaded = "1";
-    })
-    .catch(err => {
-      showToast("Explorer error: " + (err.message || err), "error");
-    });
-  }
+async function toggleExplorerNode(node, container) {
+    const path = node.dataset.path ?? "";
+
+    console.log("Explorer fetch path:", path); // 🔍 лог для отладки
+
+    // если контейнер скрыт → загружаем список
+    if (container.classList.contains("hidden")) {
+        try {
+            const res = await fetch(`${BASE_URL}/list?path=${encodeURIComponent(path)}`, {
+                headers: { "X-API-Key": API_KEY }
+            });
+
+            if (!res.ok) throw new Error(`Ошибка загрузки: ${res.status}`);
+
+            const data = await res.json();
+            container.innerHTML = ""; // очистить старое
+            data.items.forEach(dir => {
+                const childPath = path ? path + "/" + dir.name : dir.name;
+                const childNode = createExplorerNode({ 
+                    name: dir.name, 
+                    path: childPath, 
+                    is_dir: dir.is_dir 
+                });
+                container.appendChild(childNode);
+            });
+        } catch (err) {
+            showToast("Не удалось открыть папку: " + err.message, "error");
+            console.error(err);
+        }
+    }
+
+    container.classList.toggle("hidden");
 }
+
 
 /* ============ UI helpers ============ */
 function toggleStartMenu(){
